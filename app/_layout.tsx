@@ -1,7 +1,8 @@
-  import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { RegistrationProvider } from '@/context/RegistrationContext';
 import { TripRequestProvider } from '@/context/IncomingRidesContext';
@@ -9,29 +10,11 @@ import GlobalTripRequestPanel from '@/components/GlobalTripRequestPanel';
 import { auth } from '@/config/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
-// Auth screens that should NOT have the dispatch popup
-const AUTH_SCREENS = [
-  'index',
-  'registration-terms',
-  'personal-info',
-  'personal-picture',
-  'step2',
-  'step3',
-  'cyclist-step',
-  'license-step',
-  'driver-license-instructions',
-  'selfie-with-license-instructions',
-  'id-step',
-  'ridesDelivery',
-  'vehicle-information',
-  'chooseLocation',
-  'application-submitted',
-  'forgot-password',
-];
-
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
-  const fadeAnim = new Animated.Value(0);
-  const scaleAnim = new Animated.Value(0.3);
+  // CRITICAL: Use useRef for Animated.Value to prevent re-creation on each render
+  // This fixes animation issues on web where values would reset
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
     console.log('[v0] SplashScreen mounted');
@@ -55,7 +38,7 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
     }, 8000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [fadeAnim, scaleAnim, onFinish]);
 
   return (
     <View style={splashStyles.container}>
@@ -136,61 +119,65 @@ export default function RootLayout() {
   // If NOT authenticated: render auth screens WITHOUT dispatch overlay
   if (!isAuthenticated) {
     return (
-      <RegistrationProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="registration-terms" />
-          <Stack.Screen name="personal-info" />
-          <Stack.Screen name="personal-picture" />
-          <Stack.Screen name="step2" />
-          <Stack.Screen name="step3" />
-          <Stack.Screen name="cyclist-step" />
-          <Stack.Screen name="license-step" />
-          <Stack.Screen name="driver-license-instructions" />
-          <Stack.Screen name="selfie-with-license-instructions" />
-          <Stack.Screen name="id-step" />
-          <Stack.Screen name="ridesDelivery" />
-          <Stack.Screen name="vehicle-information" />
-          <Stack.Screen name="chooseLocation" />
-          <Stack.Screen name="application-submitted" />
-          <Stack.Screen name="forgot-password" />
-          <Stack.Screen name="dashboard" />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="light" />
-      </RegistrationProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <RegistrationProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="registration-terms" />
+            <Stack.Screen name="personal-info" />
+            <Stack.Screen name="personal-picture" />
+            <Stack.Screen name="step2" />
+            <Stack.Screen name="step3" />
+            <Stack.Screen name="cyclist-step" />
+            <Stack.Screen name="license-step" />
+            <Stack.Screen name="driver-license-instructions" />
+            <Stack.Screen name="selfie-with-license-instructions" />
+            <Stack.Screen name="id-step" />
+            <Stack.Screen name="ridesDelivery" />
+            <Stack.Screen name="vehicle-information" />
+            <Stack.Screen name="chooseLocation" />
+            <Stack.Screen name="application-submitted" />
+            <Stack.Screen name="forgot-password" />
+            <Stack.Screen name="dashboard" />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="light" />
+        </RegistrationProvider>
+      </GestureHandlerRootView>
     );
   }
 
   // AUTHENTICATED: render with TripRequestProvider and GlobalTripRequestPanel
   // The dispatch popup will ONLY appear here when driver is signed in
   return (
-    <RegistrationProvider>
-      <TripRequestProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="registration-terms" />
-          <Stack.Screen name="dashboard" />
-          <Stack.Screen name="personal-info" />
-          <Stack.Screen name="personal-picture" />
-          <Stack.Screen name="step2" />
-          <Stack.Screen name="step3" />
-          <Stack.Screen name="cyclist-step" />
-          <Stack.Screen name="license-step" />
-          <Stack.Screen name="driver-license-instructions" />
-          <Stack.Screen name="selfie-with-license-instructions" />
-          <Stack.Screen name="id-step" />
-          <Stack.Screen name="ridesDelivery" />
-          <Stack.Screen name="vehicle-information" />
-          <Stack.Screen name="chooseLocation" />
-          <Stack.Screen name="application-submitted" />
-          <Stack.Screen name="forgot-password" />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        {/* GLOBAL RTDB-BASED TRIP REQUEST PANEL - ONLY renders for authenticated driver */}
-        <GlobalTripRequestPanel />
-        <StatusBar style="light" />
-      </TripRequestProvider>
-    </RegistrationProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <RegistrationProvider>
+        <TripRequestProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="registration-terms" />
+            <Stack.Screen name="dashboard" />
+            <Stack.Screen name="personal-info" />
+            <Stack.Screen name="personal-picture" />
+            <Stack.Screen name="step2" />
+            <Stack.Screen name="step3" />
+            <Stack.Screen name="cyclist-step" />
+            <Stack.Screen name="license-step" />
+            <Stack.Screen name="driver-license-instructions" />
+            <Stack.Screen name="selfie-with-license-instructions" />
+            <Stack.Screen name="id-step" />
+            <Stack.Screen name="ridesDelivery" />
+            <Stack.Screen name="vehicle-information" />
+            <Stack.Screen name="chooseLocation" />
+            <Stack.Screen name="application-submitted" />
+            <Stack.Screen name="forgot-password" />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          {/* GLOBAL RTDB-BASED TRIP REQUEST PANEL - ONLY renders for authenticated driver */}
+          <GlobalTripRequestPanel />
+          <StatusBar style="light" />
+        </TripRequestProvider>
+      </RegistrationProvider>
+    </GestureHandlerRootView>
   );
 }
