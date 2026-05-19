@@ -22,7 +22,7 @@ interface TripRequestData {
 
 interface TripRequest {
   orderId: string;
-  workflowType: 'direct_trip' | 'delivery';
+  workflowType: 'direct_trip' | 'store_delivery';
   requestType: string;
   status: string;
   createdAt: number;

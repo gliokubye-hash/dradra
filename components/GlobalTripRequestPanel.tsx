@@ -28,7 +28,7 @@ const PANEL_MINIMIZED_Y = -(PANEL_HEIGHT - HANDLE_HEIGHT - STATUS_BAR_HEIGHT);
 // RTDB Trip Request structure
 interface TripRequest {
   orderId: string;
-  workflowType: 'direct_trip' | 'delivery';
+  workflowType: 'direct_trip' | 'store_delivery';
   requestType: string;
   status: string;
   createdAt: number;
@@ -362,7 +362,7 @@ export default function GlobalTripRequestPanel() {
     }
 
     // DELIVERY flow: incoming_request -> accepted -> at_store -> picked_up -> delivered -> completed
-    if (workflowType === 'delivery') {
+    if (workflowType === 'store_delivery') {
       switch (status) {
         case 'incoming_request':
           return (
@@ -485,7 +485,7 @@ export default function GlobalTripRequestPanel() {
   const getWorkflowIcon = () => {
     if (!currentRequest) return <Car color="#333" size={20} />;
     
-    if (currentRequest.workflowType === 'delivery') {
+    if (currentRequest.workflowType === 'store_delivery') {
       return <Package color="#FF6B00" size={20} />;
     }
     
