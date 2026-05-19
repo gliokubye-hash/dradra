@@ -218,234 +218,60 @@ export default function GlobalTripRequestPanel() {
     return () => off(tripRequestsRef, 'value', listener);
   }, [driverUid, currentRequest?.status, isVisible, animateToPosition]);
 
-  // Accept handler with independent loading state
-  const handleAccept = async () => {
+  // CENTRALIZED status update handler - ALL buttons use this same pattern
+  // Matches the ACCEPT button behavior which is already working correctly
+  const updateTripStatus = async (status: string) => {
     const uid = auth.currentUser?.uid;
     if (!uid || !currentRequest) return;
 
-    setIsAccepting(true);
-    try {
-      const response = await fetch(`${API_BASE}/acceptDriverRequest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: currentRequest.orderId,
-          driverId: uid,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to accept');
-      }
-      // DO NOT manually close popup or change state - WAIT for RTDB status update
-    } catch (error) {
-      console.error('[v0] Error accepting trip:', error);
-    } finally {
-      setIsAccepting(false);
+    // Set appropriate loading state based on status
+    if (status === 'accepted') {
+      setIsAccepting(true);
+    } else if (status === 'declined') {
+      setIsRejecting(true);
+    } else {
+      setIsActionLoading(true);
     }
-  };
 
-  // Reject handler with independent loading state
-  const handleReject = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !currentRequest) return;
-
-    setIsRejecting(true);
     try {
-      const response = await fetch(`${API_BASE}/declineDriverRequest`, {
+      const response = await fetch(`${API_BASE}/updateTripStatus`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: currentRequest.orderId,
           driverId: uid,
+          status: status,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to reject');
-      }
-      // DO NOT manually close popup - WAIT for RTDB to remove node
-    } catch (error) {
-      console.error('[v0] Error rejecting trip:', error);
-    } finally {
-      setIsRejecting(false);
-    }
-  };
-
-  // Specific action handlers for delivery workflow
-  const handleAtStore = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !currentRequest) return;
-
-    setIsActionLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/driverAtStore`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: currentRequest.orderId,
-          driverId: uid,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update status');
+        throw new Error(data.error || `Failed to update status to ${status}`);
       }
       // DO NOT manually update state - WAIT for RTDB status update
     } catch (error) {
-      console.error('[v0] Error calling driverAtStore:', error);
+      console.error(`[v0] Error updating trip status to ${status}:`, error);
     } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handlePickedUp = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !currentRequest) return;
-
-    setIsActionLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/pickedUpOrder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: currentRequest.orderId,
-          driverId: uid,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update status');
+      if (status === 'accepted') {
+        setIsAccepting(false);
+      } else if (status === 'declined') {
+        setIsRejecting(false);
+      } else {
+        setIsActionLoading(false);
       }
-      // DO NOT manually update state - WAIT for RTDB status update
-    } catch (error) {
-      console.error('[v0] Error calling pickedUpOrder:', error);
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
-  const handleDelivered = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !currentRequest) return;
-
-    setIsActionLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/deliveredOrder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: currentRequest.orderId,
-          driverId: uid,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update status');
-      }
-      // DO NOT manually update state - WAIT for RTDB status update
-    } catch (error) {
-      console.error('[v0] Error calling deliveredOrder:', error);
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !currentRequest) return;
-
-    setIsActionLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/completeTrip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: currentRequest.orderId,
-          driverId: uid,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to complete trip');
-      }
-      // DO NOT manually update state - WAIT for RTDB status update
-    } catch (error) {
-      console.error('[v0] Error calling completeTrip:', error);
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  // Direct trip specific handlers
-  const handleArrived = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !currentRequest) return;
-
-    setIsActionLoading(true);
-    try {
-      // For direct trip, use a generic trip status update endpoint if available
-      // or the backend may have a specific /arrivedAtPickup endpoint
-      const response = await fetch(`${API_BASE}/driverArrived`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: currentRequest.orderId,
-          driverId: uid,
-          status: 'arrived',
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update status');
-      }
-    } catch (error) {
-      console.error('[v0] Error calling driverArrived:', error);
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleStartTrip = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !currentRequest) return;
-
-    setIsActionLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/startTrip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: currentRequest.orderId,
-          driverId: uid,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to start trip');
-      }
-    } catch (error) {
-      console.error('[v0] Error calling startTrip:', error);
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
+  // All button handlers use the centralized updateTripStatus
+  const handleAccept = () => updateTripStatus('accepted');
+  const handleReject = () => updateTripStatus('declined');
+  const handleArrived = () => updateTripStatus('arrived');
+  const handleStartTrip = () => updateTripStatus('started');
+  const handleComplete = () => updateTripStatus('completed');
+  const handleAtStore = () => updateTripStatus('at_store');
+  const handlePickedUp = () => updateTripStatus('picked_up');
+  const handleDelivered = () => updateTripStatus('delivered');
 
   // Render buttons based on workflowType and RTDB status
   const renderButtons = () => {
