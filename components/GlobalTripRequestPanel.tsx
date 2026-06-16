@@ -69,6 +69,18 @@ export default function GlobalTripRequestPanel() {
   const panelY = useRef(new Animated.Value(PANEL_MINIMIZED_Y)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
+  // Live tracking of panelY's current value (avoids stale-closure base position)
+  const panelYValue = useRef<number>(PANEL_MINIMIZED_Y);
+  // The panelY value captured at the moment a drag begins
+  const dragStartY = useRef<number>(PANEL_MINIMIZED_Y);
+
+  useEffect(() => {
+    const id = panelY.addListener(({ value }) => {
+      panelYValue.current = value;
+    });
+    return () => panelY.removeListener(id);
+  }, [panelY]);
+
   // Animate panel to position
   const animateToPosition = useCallback((toValue: number, showOverlay: boolean) => {
     Animated.parallel([
@@ -86,30 +98,41 @@ export default function GlobalTripRequestPanel() {
     ]).start();
   }, [panelY, overlayOpacity]);
 
-  // Pan responder for drag gestures
+  // Pan responder for drag gestures.
+  // Created once but reads live position from refs so it never uses a stale base.
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => 
+      onMoveShouldSetPanResponder: (_, gestureState) =>
         Math.abs(gestureState.dy) > 5,
       onPanResponderGrant: () => {
-        panelY.stopAnimation();
+        // Stop any running animation and capture the ACTUAL current position
+        panelY.stopAnimation((value) => {
+          dragStartY.current = value;
+          panelYValue.current = value;
+        });
+        // Fallback in case the callback hasn't fired yet
+        dragStartY.current = panelYValue.current;
       },
       onPanResponderMove: (_, gestureState) => {
-        const baseY = isMinimized ? PANEL_MINIMIZED_Y : PANEL_EXPANDED_Y;
-        const newY = baseY + gestureState.dy;
-        // Clamp between minimized (negative) and expanded (0)
-        const clampedY = Math.max(PANEL_MINIMIZED_Y, Math.min(PANEL_EXPANDED_Y, newY));
+        // Track the finger 1:1 from where the drag started
+        const newY = dragStartY.current + gestureState.dy;
+        const clampedY = Math.max(
+          PANEL_MINIMIZED_Y,
+          Math.min(PANEL_EXPANDED_Y, newY)
+        );
         panelY.setValue(clampedY);
       },
       onPanResponderRelease: (_, gestureState) => {
         const velocity = gestureState.vy;
-        const baseY = isMinimized ? PANEL_MINIMIZED_Y : PANEL_EXPANDED_Y;
-        const currentY = baseY + gestureState.dy;
+        const currentY = Math.max(
+          PANEL_MINIMIZED_Y,
+          Math.min(PANEL_EXPANDED_Y, dragStartY.current + gestureState.dy)
+        );
         const midPoint = (PANEL_MINIMIZED_Y + PANEL_EXPANDED_Y) / 2;
 
-        // Swipe up (negative velocity) = minimize, swipe down = expand
-        if (velocity < -0.5 || (velocity >= -0.5 && velocity <= 0.5 && currentY < midPoint)) {
+        // Velocity-aware snap: fast swipe wins, otherwise nearest position
+        if (velocity < -0.5 || (velocity <= 0.5 && currentY < midPoint)) {
           // Minimize - swipe up
           animateToPosition(PANEL_MINIMIZED_Y, false);
           setIsMinimized(true);
