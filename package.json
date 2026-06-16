@@ -12,10 +12,12 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@lucide/lab": "^0.1.2",
+    "@mapbox/polyline": "^1.2.1",
     "@react-native-picker/picker": "2.11.1",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@supabase/supabase-js": "^2.58.0",
+    "@types/mapbox__polyline": "^1.0.5",
     "expo": "~54.0.33",
     "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",

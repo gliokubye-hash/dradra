@@ -83,6 +83,8 @@ import { ref, update, onValue, off, remove, set } from 'firebase/database';
 import { Home, Mail, Clock, Settings, MapPin, Shield } from 'lucide-react-native';
 import ChatPanel from '@/components/ChatPanel';
 import ToastNotification from '@/components/ToastNotification';
+import DriverMap from '@/components/DriverMap';
+import { useActiveTrip } from '@/hooks/useActiveTrip';
 import { createGeoFireObject } from '@/utils/geofire';
 import { getUnreadCount, listenForClientMessages, autoDeleteReadMessages, watchRideStatusForCleanup } from '@/utils/chat';
 
@@ -100,7 +102,13 @@ export default function Dashboard() {
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
   const [activeRideStatus, setActiveRideStatus] = useState<string | null>(null);
   const [driverData, setDriverData] = useState<any>(null);
+  const [driverId, setDriverId] = useState<string | null>(null);
+  const [vehicleType, setVehicleType] = useState<string>('economy');
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [vehiclePosition, setVehiclePosition] = useState<{ lat: number; lng: number; heading: number } | null>(null);
+
+  // Active trip from Firestore orders (drives the live map polylines + markers)
+  const { tripStatus, markers, activePolyline, showPolyline } = useActiveTrip(driverId);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -137,7 +145,7 @@ export default function Dashboard() {
       setIsLoading(false);
       return;
     }
-
+    setDriverId(uid);
     // LISTEN TO FIRESTORE drivers/{uid} for verification status (NOT Realtime DB users/{uid})
     const driverDocRef = doc(firestore, 'drivers', uid);
     const unsubscribeFirestore = onSnapshot(driverDocRef, (docSnap) => {
@@ -168,6 +176,14 @@ export default function Dashboard() {
           },
           rating: data.rating || 5.0,
         });
+
+        // Determine vehicle type for the map vehicle marker
+        const resolvedVehicleType =
+          data.vehicleType ||
+          data.serviceType ||
+          data.category ||
+          'economy';
+        setVehicleType(String(resolvedVehicleType).toLowerCase());
       }
       setIsLoading(false);
     });
@@ -286,9 +302,11 @@ export default function Dashboard() {
     console.log('[v0] Starting location tracking for driver:', uid);
 
     const subscription = await watchLocation(async (coords) => {
-      const { latitude, longitude } = coords;
+      const { latitude, longitude, heading } = coords;
 
       setCurrentLocation({ latitude, longitude });
+      // Feed the live map vehicle marker
+      setVehiclePosition({ lat: latitude, lng: longitude, heading: heading || 0 });
 
       // CRITICAL: Update driver_locations/{uid} with GeoFire format
       // This is ONLY path client app uses to find nearby drivers
@@ -361,7 +379,7 @@ export default function Dashboard() {
     const coords = await getLocation();
     if (coords) {
       const { latitude, longitude } = coords;
-
+      setVehiclePosition({ lat: latitude, lng: longitude, heading: (coords as any).heading || 0 });
       // Update driver_locations/{uid} with GeoFire format
       const geoObject = createGeoFireObject(latitude, longitude);
       await set(ref(database, `driver_locations/${uid}`), {
@@ -557,21 +575,14 @@ export default function Dashboard() {
         onHide={() => setShowToast(false)}
       />
 
-      {/* FULL SCREEN MAP BACKGROUND */}
+      {/* FULL SCREEN MAP BACKGROUND - real interactive map */}
       <View style={styles.mapFullScreen}>
-        <View style={styles.mapBackground}>
-          <View style={styles.mapGrid}>
-            {Array.from({ length: 20 }).map((_, i) => (
-              <View key={i} style={styles.mapLine} />
-            ))}
-          </View>
-          <View style={[styles.mapGrid, styles.mapGridVertical]}>
-            {Array.from({ length: 20 }).map((_, i) => (
-              <View key={i} style={styles.mapLine} />
-            ))}
-          </View>
-          <View style={styles.serviceRadius} />
-        </View>
+        <DriverMap
+          polyline={showPolyline ? activePolyline || undefined : undefined}
+          vehiclePosition={vehiclePosition || undefined}
+          vehicleType={vehicleType}
+          markers={markers}
+        />
 
         {/* Top action buttons */}
         <View style={styles.topButtons}>
